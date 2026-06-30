@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Поиск залетевших роликов — нейросети</title>
+<style>
+  :root {
+    --bg: #f5f6fa;
+    --surface-glass: rgba(255,255,255,0.7);
+    --border: #e4e6f0;
+    --border-strong: #d3d6e6;
+    --text-primary: #1a1b2e;
+    --text-secondary: #5b5d78;
+    --text-muted: #9092ab;
+    --blue: #2563eb;
+    --blue-glow: rgba(37,99,235,0.35);
+    --purple-glow: rgba(124,58,237,0.35);
+    --grad: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    --accent-bg: #eef1fd;
+    --accent-text: #2f3ed1;
+    --success: #16a34a;
+    --success-bg: #eafaf0;
+    --danger: #dc2626;
+    --danger-bg: #fdeeee;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--text-primary);
+    line-height: 1.5;
+    position: relative;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 600px 400px at 8% -5%, rgba(37,99,235,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 95% 10%, rgba(124,58,237,0.10), transparent 60%),
+      radial-gradient(ellipse 600px 500px at 50% 100%, rgba(37,99,235,0.06), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: radial-gradient(circle, rgba(91,93,120,0.10) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(ellipse 100% 80% at 50% 0%, black 30%, transparent 90%);
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 90px; position: relative; z-index: 1; }
+  .hero { margin-bottom: 32px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--blue); background: var(--accent-bg);
+    padding: 5px 12px; border-radius: 100px; margin-bottom: 14px;
+    border: 1px solid rgba(37,99,235,0.18);
+  }
+  h1 { font-size: 34px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.02em; line-height: 1.15; }
+  h1 .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .subtitle { color: var(--text-secondary); font-size: 16px; margin: 0; max-width: 560px; }
+  .card {
+    background: var(--surface-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 26px 28px;
+    margin-bottom: 22px;
+    box-shadow: 0 1px 2px rgba(20,20,50,0.04), 0 12px 32px -16px rgba(37,99,235,0.10);
+    position: relative;
+  }
+  .card h2 {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--text-secondary); margin: 0 0 18px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 i { color: var(--blue); font-size: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 500; }
+  input[type=text], input[type=password], input[type=number], select {
+    width: 100%; height: 40px; padding: 0 14px;
+    border: 1px solid var(--border-strong); border-radius: 10px;
+    background: rgba(255,255,255,0.8); color: var(--text-primary);
+    font-size: 14px; font-family: var(--font);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder { color: var(--text-muted); }
+  input:focus, select:focus {
+    outline: none; border-color: var(--blue);
+    box-shadow: 0 0 0 4px var(--blue-glow), 0 0 16px -2px var(--blue-glow);
+  }
+  .field { margin-bottom: 12px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  button {
+    height: 40px; padding: 0 18px; border-radius: 10px;
+    border: 1px solid var(--border-strong); background: rgba(255,255,255,0.7);
+    color: var(--text-primary); font-size: 14px; cursor: pointer; font-weight: 600;
+    font-family: var(--font); transition: all .15s;
+  }
+  button:hover { border-color: var(--blue); transform: translateY(-1px); }
+  button.primary {
+    background: var(--grad); color: white; border: none;
+    box-shadow: 0 4px 20px -4px var(--purple-glow), 0 2px 8px -2px var(--blue-glow);
+  }
+  button.primary:hover { box-shadow: 0 6px 28px -4px var(--purple-glow), 0 4px 14px -2px var(--blue-glow); transform: translateY(-1px); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px;
+    background: var(--bg); color: var(--text-muted); border: 1px solid var(--border);
+  }
+  .status-pill.ok { background: var(--success-bg); color: var(--success); border-color: rgba(22,163,74,0.2); }
+  .status-pill.missing { background: var(--danger-bg); color: var(--danger); border-color: rgba(220,38,38,0.15); }
+  .platform-toggles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: 10px; border: 1px solid var(--border-strong);
+    cursor: pointer; font-size: 14px; font-weight: 600; user-select: none;
+    background: rgba(255,255,255,0.6); transition: all .15s;
+  }
+  .toggle.active {
+    border-color: var(--blue); background: var(--accent-bg); color: var(--accent-text);
+    box-shadow: 0 0 0 3px var(--blue-glow);
+  }
+  .toggle input { display: none; }
+  .results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .sort-row { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-secondary); }
+  .sort-row select { height: 34px; width: auto; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left; padding: 10px 12px; color: var(--text-muted); font-weight: 700;
+    font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  td { padding: 14px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(37,99,235,0.03); }
+  .title-cell { max-width: 320px; }
+  .title-cell a { color: var(--text-primary); text-decoration: none; font-weight: 600; }
+  .title-cell a:hover { color: var(--blue); text-decoration: underline; }
+  .meta { color: var(--text-muted); font-size: 12px; margin-top: 3px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+  .badge.yt { background: var(--danger-bg); color: var(--danger); }
+  .badge.vk { background: var(--accent-bg); color: var(--accent-text); }
+  .badge.ig { background: #fdeef6; color: #c0267a; }
+  .er-high { color: var(--success); font-weight: 700; }
+  .er-mid { color: var(--text-secondary); font-weight: 600; }
+  .views-num { font-weight: 700; font-size: 14px; color: var(--text-primary); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state i { font-size: 36px; display: block; margin-bottom: 14px; color: var(--blue); opacity: 0.6; }
+  .loading { display: flex; align-items: center; gap: 12px; padding: 40px; justify-content: center; color: var(--text-secondary); font-weight: 500; }
+  .spinner {
+    width: 18px; height: 18px; border: 2.5px solid var(--border-strong);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    box-shadow: 0 0 10px -2px var(--blue-glow);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .analyze-btn { font-size: 12px; padding: 0 12px; height: 30px; background: var(--accent-bg); color: var(--accent-text); border-color: rgba(37,99,235,0.2); }
+  .analyze-btn:hover { background: var(--grad); color: white; border-color: transparent; }
+  .analysis-box {
+    background: rgba(124,58,237,0.04); border: 1px solid rgba(124,58,237,0.18); border-radius: 12px;
+    padding: 14px 16px; margin-top: 10px; font-size: 13px; white-space: pre-wrap; color: var(--text-secondary);
+  }
+  .hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .ig-note {
+    background: var(--accent-bg); border: 1px dashed rgba(37,99,235,0.3); border-radius: 14px;
+    padding: 16px 18px; font-size: 13px; color: var(--text-secondary); margin-top: 14px;
+  }
+  .footer-note { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 36px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow"><i class="ti ti-sparkles"></i>AI content radar</div>
+    <h1>Поиск <span class="grad-text">залетевших роликов</span><br>по нейросетям</h1>
+    <p class="subtitle">Находит видео с аномальным охватом по теме ИИ/нейросети на YouTube, VK и Instagram, помогает разобрать структуру хука</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="ti ti-key"></i>Настройка доступа</h2>
+    <div class="grid">
+      <div>
+        <div class="field">
+          <label>YouTube API key <span id="yt-status" class="status-pill missing">не указан</span></label>
+          <input type="password" id="yt-key" placeholder="AIzaSy..." />
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>VK access token <span id="vk-status" class="status-pill missing">не указан</span></label>
+          <input type="password" id="vk-key" placeholder="vk1.a..." />
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>Claude API key (для AI-анализа хуков) <span id="claude-status" class="status-pill missing">не указан</span></label>
+          <input type="password" id="claude-key" placeholder="sk-ant-..." />
+        </div>
+      </div>
+    </div>
+    <p class="hint">Ключи хранятся только в этой вкладке браузера, никуда не отправляются кроме официальных API соответствующих платформ. При обновлении страницы их нужно будет ввести заново.</p>
+  </div>
+
+  <div class="card">
+    <h2><i class="ti ti-adjustments"></i>Параметры поиска</h2>
+    <div class="platform-toggles">
+      <label class="toggle active" id="toggle-yt">
+        <input type="checkbox" checked /> YouTube
+      </label>
+      <label class="toggle active" id="toggle-vk">
+        <input type="checkbox" checked /> VK
+      </label>
+      <label class="toggle active" id="toggle-ig">
+        <input type="checkbox" checked /> Instagram
+      </label>
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label>Ключевые слова (через запятую)</label>
+        <input type="text" id="keywords" value="нейросети, AI агент, искусственный интеллект бизнес, чат-бот для бизнеса" />
+      </div>
+      <div class="field">
+        <label>Период публикации</label>
+        <select id="period">
+          <option value="7">Последние 7 дней</option>
+          <option value="30" selected>Последние 30 дней</option>
+          <option value="90">Последние 90 дней</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Порог "залетевшести" (мин. просмотров)</label>
+        <input type="number" id="min-views" value="50000" />
+      </div>
+    </div>
+    <div class="row">
+      <button class="primary" id="search-btn" onclick="runSearch()">Найти ролики</button>
+      <span class="hint" id="search-hint"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="results-header">
+      <h2 style="margin:0"><i class="ti ti-chart-bar" style="color:var(--blue);margin-right:6px"></i>Результаты</h2>
+      <div class="sort-row">
+        <label for="sort-select" style="margin:0">Сортировка:</label>
+        <select id="sort-select" onchange="renderResults()">
+          <option value="views">По просмотрам</option>
+          <option value="er">По engagement rate</option>
+          <option value="date">По дате</option>
+        </select>
+      </div>
+    </div>
+    <div id="results-area">
+      <div class="empty-state">
+        <i class="ti ti-search"></i>
+        Нажми "Найти ролики", чтобы начать поиск
+      </div>
+    </div>
+  </div>
+
+  <p class="footer-note">YouTube и VK используют официальные API. Instagram не предоставляет публичного API для поиска по нише — этот раздел подключается отдельно через сторонний сервис (см. подсказку в результатах).</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-logos/1.4.41/font-logos.min.css"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/tabler-icons.min.css">
+<script>
+let allResults = [];
+let analyzedItems = {};
+
+function bindKeyStatus(inputId, statusId) {
+  const input = document.getElementById(inputId);
+  const status = document.getElementById(statusId);
+  input.addEventListener('input', () => {
+    if (input.value.trim().length > 5) {
+      status.textContent = 'подключен';
+      status.className = 'status-pill ok';
+    } else {
+      status.textContent = 'не указан';
+      status.className = 'status-pill missing';
+    }
+  });
+}
+bindKeyStatus('yt-key', 'yt-status');
+bindKeyStatus('vk-key', 'vk-status');
+bindKeyStatus('claude-key', 'claude-status');
+
+['toggle-yt','toggle-vk','toggle-ig'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    el.classList.toggle('active');
+    el.querySelector('input').checked = el.classList.contains('active');
+  });
+});
+
+function isPlatformOn(id) {
+  return document.getElementById(id).classList.contains('active');
+}
+
+function daysAgo(n) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d;
+}
+
+function formatNum(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+  return String(n);
+}
+
+async function searchYouTube(keywords, period, minViews) {
+  const key = document.getElementById('yt-key').value.trim();
+  if (!key) return { items: [], error: 'no_key' };
+  const publishedAfter = daysAgo(parseInt(period)).toISOString();
+  let items = [];
+  for (const kw of keywords) {
+    try {
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(kw)}&type=video&order=viewCount&publishedAfter=${publishedAfter}&maxResults=15&key=${key}`;
+      const searchRes = await fetch(searchUrl);
+      const searchData = await searchRes.json();
+      if (searchData.error) {
+        return { items: [], error: searchData.error.message || 'api_error' };
+      }
+      const ids = (searchData.items || []).map(i => i.id.videoId).filter(Boolean).join(',');
+      if (!ids) continue;
+      const statsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${ids}&key=${key}`;
+      const statsRes = await fetch(statsUrl);
+      const statsData = await statsRes.json();
+      for (const v of (statsData.items || [])) {
+        const views = parseInt(v.statistics.viewCount || 0);
+        const likes = parseInt(v.statistics.likeCount || 0);
+        const comments = parseInt(v.statistics.commentCount || 0);
+        if (views < minViews) continue;
+        items.push({
+          platform: 'YouTube',
+          platformClass: 'yt',
+          title: v.snippet.title,
+          url: `https://www.youtube.com/watch?v=${v.id}`,
+          views, likes, comments,
+          er: views > 0 ? ((likes + comments) / views * 100) : 0,
+          date: v.snippet.publishedAt,
+          channel: v.snippet.channelTitle,
+          keyword: kw
+        });
+      }
+    } catch (e) {
+      return { items: [], error: 'network_error' };
+    }
+  }
+  return { items, error: null };
+}
+
+async function searchVK(keywords, period, minViews) {
+  const token = document.getElementById('vk-key').value.trim();
+  if (!token) return { items: [], error: 'no_key' };
+  let items = [];
+  for (const kw of keywords) {
+    try {
+      const url = `https://api.vk.com/method/video.search?q=${encodeURIComponent(kw)}&sort=2&count=15&access_token=${token}&v=5.131`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        return { items: [], error: data.error.error_msg || 'api_error' };
+      }
+      for (const v of (data.response?.items || [])) {
+        const views = v.views || 0;
+        if (views < minViews) continue;
+        const ageDays = (Date.now()/1000 - v.date) / 86400;
+        if (ageDays > parseInt(period)) continue;
+        items.push({
+          platform: 'VK',
+          platformClass: 'vk',
+          title: v.title,
+          url: `https://vk.com/video${v.owner_id}_${v.id}`,
+          views,
+          likes: v.likes?.count || 0,
+          comments: v.comments || 0,
+          er: views > 0 ? (((v.likes?.count||0) + (v.comments||0)) / views * 100) : 0,
+          date: new Date(v.date*1000).toISOString(),
+          channel: '',
+          keyword: kw
+        });
+      }
+    } catch (e) {
+      return { items: [], error: 'network_error' };
+    }
+  }
+  return { items, error: null };
+}
+
+async function runSearch() {
+  const btn = document.getElementById('search-btn');
+  const hint = document.getElementById('search-hint');
+  const resultsArea = document.getElementById('results-area');
+  btn.disabled = true;
+  resultsArea.innerHTML = '<div class="loading"><div class="spinner"></div>Ищу ролики по платформам...</div>';
+  hint.textContent = '';
+
+  const keywords = document.getElementById('keywords').value.split(',').map(s => s.trim()).filter(Boolean);
+  const period = document.getElementById('period').value;
+  const minViews = parseInt(document.getElementById('min-views').value) || 0;
+
+  allResults = [];
+  const errors = [];
+
+  if (isPlatformOn('toggle-yt')) {
+    const r = await searchYouTube(keywords, period, minViews);
+    if (r.error === 'no_key') errors.push('YouTube: укажи API key выше');
+    else if (r.error) errors.push('YouTube: ' + r.error);
+    else allResults = allResults.concat(r.items);
+  }
+
+  if (isPlatformOn('toggle-vk')) {
+    const r = await searchVK(keywords, period, minViews);
+    if (r.error === 'no_key') errors.push('VK: укажи access token выше');
+    else if (r.error) errors.push('VK: ' + r.error);
+    else allResults = allResults.concat(r.items);
+  }
+
+  let igNote = '';
+  if (isPlatformOn('toggle-ig')) {
+    igNote = `
+    <div class="ig-note">
+      <i class="ti ti-info-circle" style="margin-right:6px"></i>
+      Instagram пока не подключен — у Meta нет официального публичного API для поиска роликов по нише. Чтобы добавить эту платформу, нужен ключ от стороннего сервиса вроде Apify или EnsembleData (от $30/мес). Скажи Claude в чате "помоги подключить Instagram через Apify", и он добавит интеграцию в этот дашборд.
+    </div>`;
+  }
+
+  btn.disabled = false;
+  hint.textContent = errors.length ? errors.join(' · ') : '';
+  renderResults(igNote);
+}
+
+function renderResults(igNote) {
+  const resultsArea = document.getElementById('results-area');
+  const sortBy = document.getElementById('sort-select').value;
+
+  if (allResults.length === 0) {
+    resultsArea.innerHTML = `
+      <div class="empty-state">
+        <i class="ti ti-mood-empty"></i>
+        Ничего не найдено. Проверь ключи API и параметры поиска.
+      </div>
+      ${igNote || ''}`;
+    return;
+  }
+
+  let sorted = [...allResults];
+  if (sortBy === 'views') sorted.sort((a,b) => b.views - a.views);
+  else if (sortBy === 'er') sorted.sort((a,b) => b.er - a.er);
+  else sorted.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  let html = `<table><thead><tr>
+    <th>Платформа</th><th>Видео</th><th>Просмотры</th><th>ER</th><th>Дата</th><th></th>
+  </tr></thead><tbody>`;
+
+  sorted.forEach((item, idx) => {
+    const erClass = item.er > 5 ? 'er-high' : 'er-mid';
+    const dateStr = new Date(item.date).toLocaleDateString('ru-RU');
+    html += `<tr>
+      <td><span class="badge ${item.platformClass}">${item.platform}</span></td>
+      <td class="title-cell">
+        <a href="${item.url}" target="_blank" rel="noopener">${escapeHtml(item.title)}</a>
+        <div class="meta">${item.channel ? escapeHtml(item.channel) + ' · ' : ''}по запросу "${escapeHtml(item.keyword)}"</div>
+        <div id="analysis-${idx}"></div>
+      </td>
+      <td><span class="views-num">${formatNum(item.views)}</span></td>
+      <td class="${erClass}">${item.er.toFixed(2)}%</td>
+      <td>${dateStr}</td>
+      <td><button class="analyze-btn" onclick="analyzeItem(${idx}, this)">Разобрать хук</button></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  html += igNote || '';
+  resultsArea.innerHTML = html;
+  window.__sortedResults = sorted;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+async function analyzeItem(idx, btnEl) {
+  const claudeKey = document.getElementById('claude-key').value.trim();
+  const item = window.__sortedResults[idx];
+  const box = document.getElementById('analysis-' + idx);
+
+  if (!claudeKey) {
+    box.innerHTML = '<div class="analysis-box">Чтобы получить AI-разбор структуры хука, укажи Claude API key в настройках выше.</div>';
+    return;
+  }
+
+  btnEl.disabled = true;
+  btnEl.textContent = 'Анализирую...';
+
+  try {
+    const prompt = `Проанализируй заголовок этого вирального ролика про нейросети/ИИ для бизнеса и опиши кратко (3-4 пункта):
+1. Какой тип хука использован (вопрос, цифра, провокация, боль, etc)
+2. На какую эмоцию/потребность давит заголовок
+3. Можно ли применить эту структуру в формуле Боль → Эмпатия → "Я как ты" → Метафора → Объекция → Неизбежность → Масштаб
+4. Конкретная идея, как переиспользовать этот хук для контента про НЭЙРУ или НЭЙРОПОЛИЮ
+
+Заголовок: "${item.title}"
+Платформа: ${item.platform}
+Просмотры: ${item.views}
+
+Ответь кратко, по делу, на русском.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await response.json();
+    if (data.error) {
+      box.innerHTML = `<div class="analysis-box">Ошибка: ${escapeHtml(data.error.message || 'не удалось получить ответ')}</div>`;
+    } else {
+      const text = data.content.map(c => c.text || '').join('\n');
+      box.innerHTML = `<div class="analysis-box">${escapeHtml(text)}</div>`;
+    }
+  } catch (e) {
+    box.innerHTML = '<div class="analysis-box">Сетевая ошибка при обращении к Claude API.</div>';
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = 'Разобрать хук';
+  }
+}
+</script>
+</body>
+</html>
